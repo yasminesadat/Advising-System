@@ -125,7 +125,7 @@ course_id int NOT NULL,
 instructor_id int NOT NULL,
 semester_code varchar(40) NOT NULL,
 exam_type varchar(40) DEFAULT 'Normal' check(exam_type IN ('Normal','First_makeup','Second_makeup')),
-grade decimal(4,2) check(grade BETWEEN O AND 100),  --? is it the percentage?
+grade decimal(4,2) check(grade BETWEEN 0 AND 100),  --? is it the percentage?
 PRIMARY KEY(student_id,course_id,instructor_id),
 CONSTRAINT FK_SIC1 FOREIGN KEY(student_id) references Student(student_id),
 CONSTRAINT FK_SIC2 FOREIGN KEY(course_id) references Course(course_id),
@@ -165,7 +165,7 @@ CREATE TABLE GradPlan_Course(
 plan_id int ,
 semester_code varchar(40) , 
 course_id int,
-CONSTRAINT FK_GC1 FOREIGN KEY(plan_id, semester_code) REFERENCES Graduation_plan(plan_id, semester_code),
+CONSTRAINT FK_GC1 FOREIGN KEY(plan_id, semester_code) REFERENCES Graduation_Plan(plan_id, semester_code),
 CONSTRAINT FK_GC2 FOREIGN KEY(course_id) references Course(course_id),
 primary key(plan_id,semester_code,course_id)
 );
@@ -247,7 +247,7 @@ DROP TABLE GradPlan_Course;
 DROP TABLE Slot;
 DROP TABLE Course_Semester;
 DROP TABLE Student;
-DROP TABLE Makeup_Exam;
+DROP TABLE MakeUp_Exam;
 DROP TABLE Course;
 GO
 
@@ -261,7 +261,7 @@ DELETE FROM Slot;
 DELETE FROM GradPlan_Course;
 DELETE FROM Graduation_Plan;
 DELETE FROM Exam_Student;
-DELETE FROM Makeup_Exam;
+DELETE FROM MakeUp_Exam;
 DELETE FROM Student_Instructor_Course_Take;
 DELETE FROM Instructor_Course;
 DELETE FROM PreqCourse_course;
