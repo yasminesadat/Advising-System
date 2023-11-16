@@ -278,9 +278,10 @@ GO
 --EXEC clearAllTables
 
 --******************  Basic Data Retrieval  *****************
-
 CREATE VIEW view_Students AS
-SELECT * FROM Student;
+SELECT student_id, f_name, l_name, gpa, 
+faculty, email, major, password, semester, acquired_hours, assigned_hours int,
+advisor_id FROM Student WHERE financial_status=1;
 -- SELECT * FROM view_Students;
 
 GO
@@ -507,4 +508,24 @@ INSERT INTO PAYMENT VALUES(22,3000,'12-1-2020',3,'notPaid',0,'9-1-2020',1,1);
 EXEC Procedures_AdminIssueInstallment 22
 */
 
---last reviewed and added 2.3L
+--last reviewed and added in order 2.3L
+
+--- 2.3 O ---
+CREATE VIEW all_Pending_Requests AS  --? have both advisor and student IDs and names?
+SELECT R.request_id, R.type, R.comment,R.credit_hours,R.course_id,R.student_id,S.f_name,S.l_name, R.advisor_id,
+A.name AS 'advisor_name'
+FROM Request R INNER JOIN 
+     Student S ON R.student_id=S.student_id INNER JOIN
+     Advisor A ON R.advisor_id=A.advisor_id
+WHERE R.status='pending';
+-- SELECT * FROM all_Pending_Requests;
+
+--- 2.3 Z ---
+GO
+CREATE PROC Procedures_AdvisorViewPendingRequests
+@advisorID int
+AS
+Select R.request_id, R.type, R.comment,R.credit_hours,R.student_id,R.course_id 
+FROM Request R WHERE R.status='pending' AND R.advisor_id=@advisorID;
+GO
+-- EXEC Procedures_AdvisorViewPendingRequests 1;
