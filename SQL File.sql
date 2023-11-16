@@ -20,7 +20,7 @@ CREATE TABLE Student(
 student_id int PRIMARY KEY IDENTITY,
 f_name varchar(40) NOT NULL,
 l_name varchar(40) NOT NULL,
-gpa decimal(3,2) NOT NULL check(gpa BETWEEN 0.7 AND 4),
+gpa decimal(3,2) check(gpa BETWEEN 0.7 AND 4), --? NOT NULL but PROC
 faculty varchar(40) NOT NULL,
 email varchar(40) NOT NULL,
 major varchar(40) NOT NULL,
@@ -29,14 +29,14 @@ financial_status bit,
 --AS CASE WHEN CURRENT_TIMESTAMP>(Installment(deadline))
 -- Installment.status=1 THEN 1 ELSE O END,
 semester int NOT NULL,
-acquired_hours int NOT NULL,
+acquired_hours int,  --?  NOT NULL but PROC
 assigned_hours int,
 advisor_id int ,
 CONSTRAINT FK_Student FOREIGN KEY(advisor_id) references Advisor(advisor_id) 
 );
 
 CREATE TABLE Course(
-course_id int PRIMARY KEY,
+course_id int PRIMARY KEY IDENTITY,  --identity to be compatible with procedure
 name varchar(40) NOT NULL,
 major varchar(40) NOT NULL,
 is_offered bit NOT NULL,
@@ -67,14 +67,15 @@ CREATE TABLE Payment(
 payment_id int primary key,
 amount int not null,
 deadline datetime not null,
-n_installments int not null,
+n_installments int not null ,
 status varchar(40) not null default 'notPaid' check (status in ('notPaid','Paid')),
 fund_percentage decimal(5,2) not null, --important: max=100.00
 start_date datetime not null,
 student_id int not null,
 semester_code varchar(40) not null,
 CONSTRAINT FK_Payment_S foreign key (student_id) references Student(student_id) ,
-CONSTRAINT FK_Payment_SC foreign key (semester_code) references Semester(semester_code) 
+CONSTRAINT FK_Payment_SC foreign key (semester_code) references Semester(semester_code),
+CONSTRAINT Chk_Installments check (n_installments IN(0,DATEDIFF(MONTH, start_date, deadline)))
 );
 
 CREATE TABLE Installment(
@@ -86,8 +87,6 @@ start_date datetime not null,
 CONSTRAINT FK_Installment foreign key (payment_id) references Payment(payment_id) ,
 primary key(payment_id,deadline)
 );
-
---CHECK (n_installments = TIMESTAMPDIFF(MONTH, start_date, deadline)),
 
 CREATE TABLE Student_Phone(
 student_id int ,
@@ -195,15 +194,15 @@ EXEC CreateAllTables;
 ----------------------------------- TEST VALUES ---------------------------------------
 INSERT INTO Advisor VALUES('ahmed','hi@gmail.com','C5','cheese');
 INSERT INTO Student VALUES('ali','z',2.1,'eng','@','MET','batetes',1,4,3,2,1);
-INSERT INTO Course VALUES(43,'math','eng',1,23,1);
-INSERT INTO Request VALUES(5435,'a','hi','pending',13,1,1,43);
+INSERT INTO Course VALUES('math','eng',1,23,1);
+INSERT INTO Request VALUES(5435,'a','hi','pending',13,1,1,1);
 INSERT INTO Semester VALUES('1','1-11-2000','1-12-2000');
-INSERT INTO Payment VALUES(49,12345,'1-11-2000',1,'notPaid',50,'11-2-2000',1,'1');
+INSERT INTO Payment VALUES(49,12345,'11-25-2000',4,'notPaid',50,'7-2-2000',1,'1');
 INSERT INTO Installment VALUES(49,'11-2-2000',13,'notPaid','11-20-2000');
 INSERT INTO Instructor VALUES(1,'ah','@','M','C');
-INSERT INTO MakeUp_Exam VALUES('11-2-2020','First_makeup',43);
+INSERT INTO MakeUp_Exam VALUES('11-2-2020','First_makeup',1);
 INSERT INTO Graduation_Plan VALUES(1,'s23',20,1,1,1);
-INSERT INTO Slot VALUES('mon','first','C3.215',43,1);
+INSERT INTO Slot VALUES('mon','first','C3.215',1,1);
 ----------------------------------------------------------------------------------------
 
 GO
@@ -348,5 +347,164 @@ FROM Graduation_Plan G INNER JOIN
 -- SELECT * FROM Advisors_Graduation_Plan; 
 
 --******************  All Other Requirements  *****************
+--Drop Proc 
 
-      
+GO
+CREATE PROC Procedures_StudentRegistration
+@first_name varchar(40),
+@last_name varchar(40),
+@password varchar(40),
+@faculty varchar(40),
+@email varchar(40),
+@major varchar(40),
+@semester int,
+@studentID int OUTPUT
+AS
+INSERT INTO Student(f_name, l_name, password, faculty, email, major, semester)  --?shouldn't student be registered with GPA and acq hours?
+VALUES(@first_name, @last_name, @password, @faculty, @email, @major, @semester);  
+SELECT @studentID=student_id FROM Student
+WHERE email=@email;;
+GO
+/*
+declare @ID int;
+EXEC Procedures_StudentRegistration 'ahmed','sameh','frewr','eng','@mail','CSEN MET', 5, @ID OUTPUT;   
+print(@ID);
+*/
+
+GO
+CREATE PROC Procedures_AdvisorRegistration
+@name varchar(40),
+@password varchar(40),
+@email varchar(40),
+@office varchar (40),
+@advisorID int OUTPUT
+AS
+INSERT INTO Advisor VALUES(@name, @email, @office, @password); 
+SELECT @advisorID=advisor_id FROM Advisor
+WHERE email=@email AND name=@name;;
+GO
+/*
+declare @ID int;
+EXEC Procedures_AdvisorRegistration 'heba', 'rq2f','2mail','C4.123',@ID OUTPUT ;
+print @ID;
+*/
+
+GO
+CREATE PROC Procedures_AdminListStudents
+AS
+SELECT student_id,f_name,l_name FROM Student;;  --? intended info to be displayed?
+GO  
+--EXEC Procedures_AdminListStudents
+
+GO
+CREATE PROC Procedures_AdminListAdvisors
+AS
+SELECT advisor_id,name FROM Advisor;;
+GO
+--EXEC Procedures_AdminListAdvisors
+
+GO
+CREATE PROC AdminListStudentsWithAdvisors
+AS
+SELECT S.student_id,S.f_name,S.l_name,A.advisor_id, A.name AS 'advisor_name' 
+FROM Student S,Advisor A
+WHERE S.advisor_id=A.advisor_id;;
+GO
+-- EXEC AdminListStudentsWithAdvisors
+
+GO
+CREATE PROC AdminAddingSemester
+@start_date date,
+@end_date date,
+@semester_code varchar(40)
+AS
+INSERT INTO Semester VALUES(@semester_code, @start_date, @end_date);;
+GO 
+--EXEC AdminAddingSemester '10-1-2020','12-1-2020','W20'
+
+GO
+CREATE PROC Procedures_AdminAddingCourse
+@major varchar(40), 
+@semester int,
+@credit_hours int,
+@course_name varchar(40), 
+@offered bit
+AS 
+INSERT INTO Course VALUES(@course_name, @major, @offered, @credit_hours, @semester);;
+GO
+--EXEC Procedures_AdminAddingCourse 'ENGE',3,4,'Math3',1
+
+GO
+CREATE PROC Procedures_AdminLinkInstructor
+@instructorID int,
+@courseID int,
+@slotID int
+AS
+UPDATE Slot SET course_id=@courseID, instructor_id=@instructorID WHERE slot_id=@slotID;
+INSERT INTO Instructor_Course VALUES(@courseID,@instructorID);; --? necessary right?
+GO
+--EXEC Procedures_AdminLinkInstructor 1,1,1
+GO
+CREATE PROC Procedures_AdminLinkStudent
+@instructorID int,
+@studentID int, 
+@courseID int,
+@semester_code varchar (40)
+AS
+INSERT INTO Student_Instructor_Course_Take(student_id, course_id, instructor_id, semester_code)
+VALUES(@studentID, @courseID, @instructorID, @semester_code);;
+GO
+-- EXEC Procedures_AdminLinkStudent 1,1,1,1
+
+GO
+CREATE PROC Procedures_AdminLinkStudentToAdvisor
+@studentID int,
+@advisorID int
+AS
+UPDATE Student SET advisor_id=@advisorID WHERE student_id=@studentID;;
+GO
+--EXEC Procedures_AdminLinkStudentToAdvisor 1,1
+
+GO
+CREATE PROC Procedures_AdminAddExam
+@Type varchar(40),
+@date datetime, 
+@courseID int
+AS
+INSERT INTO MakeUp_Exam VALUES (@date,@Type,@courseID);;
+GO
+--EXEC Procedures_AdminAddExam 'Second_makeup','2020-04-03',1
+
+GO
+CREATE PROC Procedures_AdminIssueInstallment
+@paymentID int
+AS
+
+declare @NumInstallments int,
+@PaymentDeadline datetime, 
+@TotalAmount int, 
+@Paymentstart_date datetime, 
+@num int =0,
+@InstallmentAmount decimal(8,2) --? right datatype?
+
+SELECT @NumInstallments = n_installments,
+@PaymentDeadline = deadline,
+@TotalAmount = amount,
+@Paymentstart_date = start_date FROM Payment WHERE Payment.payment_id=@paymentID
+
+SET @InstallmentAmount=@TotalAmount/@NumInstallments
+WHILE @NumInstallments>@num
+BEGIN 
+   declare @start datetime=DATEADD(MONTH,@num,@Paymentstart_date),
+   @end datetime=DATEADD(MONTH,@num+1,@Paymentstart_date)
+   SET @num+=1
+   INSERT INTO Installment VALUES(@paymentID,@end,@InstallmentAmount,'notPaid',@start)
+END;
+GO
+
+/*
+INSERT INTO PAYMENT VALUES(22,3000,'12-1-2020',3,'notPaid',0,'9-1-2020',1,1);
+EXEC Procedures_AdminIssueInstallment 22
+*/
+
+--last reviewed and added 2.3L
