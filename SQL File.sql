@@ -28,7 +28,7 @@ password varchar(40) NOT NULL,
 financial_status bit,
 --AS CASE WHEN CURRENT_TIMESTAMP>(Installment(deadline))
 -- Installment.status=1 THEN 1 ELSE O END,
-semester varchar(40) NOT NULL,
+semester int NOT NULL,
 acquired_hours int NOT NULL,
 assigned_hours int,
 advisor_id int ,
@@ -54,7 +54,8 @@ student_id int not null,
 advisor_id int not null,
 course_id int not null,
 CONSTRAINT FK_Request_S foreign key (student_id) references Student(student_id),
-CONSTRAINT FK_Request_A foreign key (advisor_id) references Advisor(advisor_id)
+CONSTRAINT FK_Request_A foreign key (advisor_id) references Advisor(advisor_id),
+CONSTRAINT FK_Request_C foreign key (course_id) references Course(course_id)
 );
 
 CREATE TABLE Semester(
@@ -65,23 +66,23 @@ end_date DATE NOT NULL);
 CREATE TABLE Payment(
 payment_id int primary key,
 amount int not null,
-deadline date not null,
+deadline datetime not null,
 n_installments int not null,
-status varchar(40) default 'notPaid' check (status in ('notPaid','Paid')),
-fund_percentage int not null,
+status varchar(40) not null default 'notPaid' check (status in ('notPaid','Paid')),
+fund_percentage decimal(5,2) not null, --important: max=100.00
+start_date datetime not null,
 student_id int not null,
 semester_code varchar(40) not null,
-start_date date not null,
 CONSTRAINT FK_Payment_S foreign key (student_id) references Student(student_id) ,
 CONSTRAINT FK_Payment_SC foreign key (semester_code) references Semester(semester_code) 
 );
 
 CREATE TABLE Installment(
 payment_id int ,
-deadline date,
+deadline datetime,
 amount int not null,
-status bit not null,
-start_date date not null,
+status varchar(40) default 'notPaid' check (status in ('notPaid','Paid')), 
+start_date datetime not null,
 CONSTRAINT FK_Installment foreign key (payment_id) references Payment(payment_id) ,
 primary key(payment_id,deadline)
 );
@@ -90,7 +91,7 @@ primary key(payment_id,deadline)
 
 CREATE TABLE Student_Phone(
 student_id int ,
-phone_number int, 
+phone_number varchar(40), 
 PRIMARY KEY(student_id,phone_number),
 CONSTRAINT FK_SP FOREIGN KEY(student_id) references Student(student_id)
 );
@@ -125,7 +126,7 @@ course_id int NOT NULL,
 instructor_id int NOT NULL,
 semester_code varchar(40) NOT NULL,
 exam_type varchar(40) DEFAULT 'Normal' check(exam_type IN ('Normal','First_makeup','Second_makeup')),
-grade decimal(4,2) check(grade BETWEEN 0 AND 100),  --? is it the percentage?
+grade varchar(40),  --? check letter?
 PRIMARY KEY(student_id,course_id,instructor_id),
 CONSTRAINT FK_SIC1 FOREIGN KEY(student_id) references Student(student_id),
 CONSTRAINT FK_SIC2 FOREIGN KEY(course_id) references Course(course_id),
@@ -153,7 +154,7 @@ CREATE TABLE Graduation_Plan(
 plan_id int, 
 semester_code varchar(40) , 
 semester_credit_hours int NOT NULL, 
-expected_grad_semester int NOT NULL , 
+expected_grad_semester varchar(40) NOT NULL , 
 advisor_id int NOT NULL ,
 student_id int NOT NULL,
 CONSTRAINT FK_GP1 FOREIGN KEY(advisor_id) references Advisor(advisor_id),
@@ -165,16 +166,16 @@ CREATE TABLE GradPlan_Course(
 plan_id int ,
 semester_code varchar(40) , 
 course_id int,
-CONSTRAINT FK_GC1 FOREIGN KEY(plan_id, semester_code) REFERENCES Graduation_Plan(plan_id, semester_code),
-CONSTRAINT FK_GC2 FOREIGN KEY(course_id) references Course(course_id),
+CONSTRAINT FK_GC1 FOREIGN KEY(plan_id, semester_code) references Graduation_Plan(plan_id, semester_code),
+CONSTRAINT FK_GC2 FOREIGN KEY(course_id) references Course(course_id), --asked TA said it can be fk or multivalued attribute
 primary key(plan_id,semester_code,course_id)
 );
 
 CREATE TABLE Slot(
 slot_id int PRIMARY KEY IDENTITY, 
 day varchar(40) NOT NULL, 
-time int NOT NULL , 
-location VARCHAR(40) NOT NULL, 
+time varchar(40) NOT NULL , 
+location varchar(40) NOT NULL, 
 course_id int,
 instructor_id int,
 CONSTRAINT FK_SC1 FOREIGN KEY (course_id) references Course(course_id) , 
@@ -195,14 +196,14 @@ EXEC CreateAllTables;
 INSERT INTO Advisor VALUES('ahmed','hi@gmail.com','C5','cheese');
 INSERT INTO Student VALUES('ali','z',2.1,'eng','@','MET','batetes',1,4,3,2,1);
 INSERT INTO Course VALUES(43,'math','eng',1,23,1);
-INSERT INTO Request VALUES(5435,'a','hi','pending',13,1,1,1);
+INSERT INTO Request VALUES(5435,'a','hi','pending',13,1,1,43);
 INSERT INTO Semester VALUES('1','1-11-2000','1-12-2000');
-INSERT INTO Payment VALUES(4364783,46967239,'1-11-2000',1,'notPaid',50,1,'1','11-2-2000');
-INSERT INTO Installment VALUES(4364783,'11-2-2000',13,0,'11-20-2000');
+INSERT INTO Payment VALUES(49,12345,'1-11-2000',1,'notPaid',50,'11-2-2000',1,'1');
+INSERT INTO Installment VALUES(49,'11-2-2000',13,'notPaid','11-20-2000');
 INSERT INTO Instructor VALUES(1,'ah','@','M','C');
-INSERT INTO MakeUp_Exam VALUES(21,'11-2-2020','First_makeup',1);
+INSERT INTO MakeUp_Exam VALUES('11-2-2020','First_makeup',43);
 INSERT INTO Graduation_Plan VALUES(1,'s23',20,1,1,1);
-INSERT INTO Slot VALUES('Mon',2,'iew',1,1);
+INSERT INTO Slot VALUES('mon','first','C3.215',43,1);
 ----------------------------------------------------------------------------------------
 
 GO
@@ -210,7 +211,7 @@ CREATE PROCEDURE DropAllTables AS
 ALTER TABLE Student
 DROP Constraint FK_Student;
 ALTER TABLE Request
-DROP CONSTRAINT FK_Request_S, FK_Request_A;
+DROP CONSTRAINT FK_Request_S, FK_Request_A, FK_Request_C;
 ALTER TABLE Payment
 DROP CONSTRAINT FK_Payment_S,FK_Payment_SC;
 ALTER TABLE Installment
@@ -347,4 +348,5 @@ FROM Graduation_Plan G INNER JOIN
 -- SELECT * FROM Advisors_Graduation_Plan; 
 
 --******************  All Other Requirements  *****************
+
       
