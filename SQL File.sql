@@ -49,10 +49,11 @@ request_id int primary key,
 type varchar(40) not null,
 comment varchar(40) not null,
 status varchar(40) not null check(status IN ('pending','approved','rejected')) default 'pending',
-credit_hours int not null,
+credit_hours int,  --? will be null if it is an add course request
+                   --? have its check here or in procedure only?
 student_id int not null,
 advisor_id int not null,
-course_id int not null,
+course_id int,
 CONSTRAINT FK_Request_S foreign key (student_id) references Student(student_id),
 CONSTRAINT FK_Request_A foreign key (advisor_id) references Advisor(advisor_id),
 CONSTRAINT FK_Request_C foreign key (course_id) references Course(course_id)
@@ -150,7 +151,7 @@ CONSTRAINT FK_ES2 FOREIGN KEY (student_id) references Student(student_id)
 );
 
 CREATE TABLE Graduation_Plan(
-plan_id int, 
+plan_id int IDENTITY, 
 semester_code varchar(40) , 
 semester_credit_hours int NOT NULL, 
 expected_grad_semester varchar(40) NOT NULL , 
@@ -201,7 +202,7 @@ INSERT INTO Payment VALUES(49,12345,'11-25-2000',4,'notPaid',50,'7-2-2000',1,'1'
 INSERT INTO Installment VALUES(49,'11-2-2000',13,'notPaid','11-20-2000');
 INSERT INTO Instructor VALUES(1,'ah','@','M','C');
 INSERT INTO MakeUp_Exam VALUES('11-2-2020','First_makeup',1);
-INSERT INTO Graduation_Plan VALUES(1,'s23',20,1,1,1);
+INSERT INTO Graduation_Plan VALUES('s23',20,1,1,1);
 INSERT INTO Slot VALUES('mon','first','C3.215',1,1);
 ----------------------------------------------------------------------------------------
 
@@ -508,9 +509,30 @@ INSERT INTO PAYMENT VALUES(22,3000,'12-1-2020',3,'notPaid',0,'9-1-2020',1,1);
 EXEC Procedures_AdminIssueInstallment 22
 */
 
---last reviewed and added in order 2.3L
+GO
+CREATE PROC Procedures_AdminDeleteCourse
+@courseID int
+AS
+DELETE FROM Slot WHERE course_id=@courseID;
+DELETE FROM Course WHERE course_id=@courseID;;
+GO
+-- EXEC Procedures_AdminDeleteCourse 2;
 
---- 2.3 O ---
+GO
+CREATE PROC Procedure_AdminUpdateStudentStatus
+@StudentID int
+AS
+UPDATE Student SET financial_status=
+CASE WHEN EXISTS (
+SELECT S.student_id 
+FROM Student S INNER JOIN
+     Payment P on S.student_id=P.student_id INNER JOIN 
+     Installment I on P.payment_id=I.payment_id
+WHERE S.student_id=@StudentID AND I.status='notPaid' AND I.deadline<GETDATE()
+) THEN 0 ELSE 1 END;
+GO
+--EXEC Procedure_AdminUpdateStudentStatus 1
+
 CREATE VIEW all_Pending_Requests AS  --? have both advisor and student IDs and names?
 SELECT R.request_id, R.type, R.comment,R.credit_hours,R.course_id,R.student_id,S.f_name,S.l_name, R.advisor_id,
 A.name AS 'advisor_name'
@@ -519,6 +541,50 @@ FROM Request R INNER JOIN
      Advisor A ON R.advisor_id=A.advisor_id
 WHERE R.status='pending';
 -- SELECT * FROM all_Pending_Requests;
+
+GO 
+CREATE PROC Procedures_AdminDeleteSlots( --? why have semester if is_offered tells us all not offered courses
+@current_semester varchar (40))
+AS
+SELECT course_id INTO NotOfferedCourses FROM Course
+WHERE  is_offered=0;
+DELETE FROM Slot 
+WHERE course_id IN (SELECT * FROM NotOfferedCourses);
+DROP TABLE NotOfferedCourses;;
+GO
+/*
+exec Procedures_AdminDeleteSlots '5';
+
+SELECT * FROM Slot
+SELECT * FROM Course_Semester
+SELECT * FROM Course
+*/
+
+----------------------------------------------- PLACE Q HERE -------------------------------
+GO
+CREATE PROC Procedures_AdvisorCreateGP
+@semester_code varchar(40),
+@expected_graduation_semester varchar(40),  --? not date right? it's a typo
+@sem_credit_hours int, 
+@advisor_id int, 
+@student_id int
+AS
+insert into Graduation_Plan values(@semester_code,@sem_credit_hours,@expected_graduation_semester,@advisor_id,@student_id);;
+GO
+--exec Procedures_AdvisorCreateGP 1,'s23',35,1,1
+
+GO
+CREATE PROC Procedures_AdvisorAddCourseGP
+@student_id int,
+@Semester_code varchar(40), 
+@course_name varchar(40)
+as
+declare @planID int
+SELECT @planID=plan_id from Graduation_Plan where semester_code=@Semester_code and student_id=@student_id
+if @planID is not null
+INSERT INTO GradPlan_Course values(@planID,@Semester_code, (select course_id from Course where name=@course_name));;
+GO
+--exec Procedures_AdvisorAddCourseGP 1,'s23','math'
 
 --- 2.3 Z ---
 GO
@@ -529,3 +595,57 @@ Select R.request_id, R.type, R.comment,R.credit_hours,R.student_id,R.course_id
 FROM Request R WHERE R.status='pending' AND R.advisor_id=@advisorID;
 GO
 -- EXEC Procedures_AdvisorViewPendingRequests 1;
+
+GO
+CREATE PROC Procedures_AdvisorUpdateGP
+@expected_grad_semester varchar(40), @studentID int
+AS
+Update Graduation_Plan 
+Set expected_grad_semester = @expected_grad_semester
+Where student_id = @studentID;;
+GO
+--exec  Procedures_AdvisorUpdateGP 'S29',1
+
+GO
+CREATE PROC Procedures_AdvisorDeleteFromGP
+@studentID int, 
+@semester_code varchar(40), 
+@courseID int
+as
+delete from GradPlan_Course
+where course_id=@courseID and plan_id=(select plan_id from Graduation_Plan where semester_code=@semester_code and student_id=@studentID)
+GO
+--exec Procedures_AdvisorDeleteFromGP 1,'s23',1;
+
+----------------------------------------------- PLACE V HERE -------------------------------
+GO
+CREATE PROC Procedures_AdvisorApproveRejectCHRequest
+@RequestID int, 
+@Current_semester_code varchar (40)
+AS 
+DECLARE @assigned_hours int,
+@student_id int,
+@credit_hrs int
+
+SELECT @credit_hrs=credit_hours, @student_id=student_id FROM Request
+WHERE @RequestID = request_id
+
+SELECT @assigned_hours=assigned_hours FROM Student
+WHERE @student_id = student_id
+
+IF((SELECT gpa FROM Student WHERE student_id=@student_id)<=3.7 AND 
+@assigned_hours+@credit_hrs < 34 AND @credit_hrs< 4 AND @credit_hrs>0)
+BEGIN
+UPDATE Request set status = 'approved'
+WHERE @RequestID = request_id;
+
+UPDATE Student set assigned_hours=@assigned_hours+@credit_hrs
+WHERE @student_id = student_id;
+END
+
+ELSE
+UPDATE Request set status = 'rejected'
+WHERE @RequestID = request_id;;
+GO
+-- not tested yet
+
