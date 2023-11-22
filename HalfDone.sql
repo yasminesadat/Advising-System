@@ -1,4 +1,143 @@
-﻿--X
+﻿create function dbo.FN_Advisors_Requests(
+@advisorID int
+)
+returns @Result Table
+(
+request_id int, type varchar(40), comment varchar(40), status varchar(40), credit_hours int, student_id int, advisor_id int, course_id int
+)
+as
+begin
+insert into @Result(request_id, type, comment, status, credit_hours, student_id, advisor_id, course_id)
+SELECT * FROM Request 
+WHERE @advisorID = Request.advisor_id 
+
+
+return
+end
+go
+
+
+
+-------------------------------------------
+
+
+
+create function dbo.FN_AdvisorLogin
+(
+    @Advisor_ID int ,
+    @password varchar(40)
+
+)
+RETURNS Bit 
+AS
+Begin
+
+DECLARE @confirm bit =0
+DECLARE @username varchar(40)
+DECLARE @password2 varchar(40)
+
+SELECT @username = name FROM Advisor 
+WHERE @Advisor_ID = advisor_id
+
+SELECT @password2 = password FROM Advisor 
+WHERE @username = name
+
+IF @password=@password2
+begin
+set @confirm=1
+
+end
+return @confirm
+end
+go
+
+
+-----------------------------------------------------------
+create function dbo.FN_StudentLogin
+(
+    @Student_ID int ,
+    @password varchar(40)
+
+)
+RETURNS Bit 
+AS
+Begin
+
+DECLARE @confirm bit =0
+DECLARE @username varchar(40)
+DECLARE @password2 varchar(40)
+
+SELECT @username = f_name FROM Student 
+WHERE @Student_ID = student_id
+
+SELECT @password2 = password FROM Student 
+WHERE @username = f_name
+
+IF @password=@password2
+begin
+set @confirm=1
+
+end
+return @confirm
+end
+go
+
+------------------------------------------
+create function dbo.SemesterAvailableCourses
+(
+    @semester_code varchar(40)
+
+)
+RETURNS @Result table (course_id int, course_name varchar(40))
+AS
+Begin
+declare @course_id int
+
+select @course_id=course_id from Course_Semester where @semester_code=semester_code
+
+insert into @Result(course_id,course_name)
+select course_id,name from Course where @course_id=course_id
+
+return
+end
+go
+
+--select * from dbo.SemesterAvailableCourses('w23')
+
+------------------------------------------
+create function dbo.FN_StudentViewSlot
+(
+    @courseID int, @instructorID int
+
+)
+RETURNS @Result table (slotID int, location varchar(40), time varchar(40),day varchar(40),course_name varchar(40), instructor_name varchar(40))
+AS
+Begin
+declare @course_name varchar(40)
+declare @instructor_name varchar(40)
+
+select @course_name=name from Course where @courseID=course_id
+select @instructor_name=name from Instructor where @instructorID=instructor_id
+
+insert into @Result(slotID,location,time,day) select slot_id,day,time,location from Slot where course_id=@courseID and instructor_id=@instructorID
+insert into @Result(course_name) select name from Course where @courseID=course_id
+insert into @Result(instructor_name) select name from Instructor where @instructorID=instructor_id
+
+
+
+return
+end
+go
+
+select * from dbo.FN_StudentViewSlot(1,1)
+
+select * from Course
+select * from Instructor
+select * from Slot
+insert into Slot values('13','15','Yes',1,1)
+
+------------------------------------------
+--X
 GO
 CREATE PROC Procedures_AdvisorViewAssignedStudents
 @AdvisorID int, 
@@ -10,6 +149,7 @@ inner join Course on Course.course_id=Student_Instructor_Course_Take.course_id
 where Student.advisor_id=@AdvisorID and Student.major=@major;;
 GO
 --exec Procedures_AdvisorViewAssignedStudents 1,'CS'
+
 --Y 
 GO
 CREATE PROC Procedures_AdvisorApproveRejectCourseRequest  --? null instructor problem
@@ -27,8 +167,8 @@ WHERE @RequestID=request_id AND @studentID=student_id AND @advisorID=advisor_id;
 SELECT @assigned_hours=assigned_hours FROM Student
 WHERE @studentID=student_id;
 
-SELECT @credit_hrs=credit_hours FROM Course
-WHERE @courseID=course_id;
+SELECT @credit_hrs=credit_hours FROM Request
+WHERE @RequestID=request_id AND @studentID=student_id AND @advisorID=advisor_id;
 
 SELECT prerequisite_course_id INTO PreqTable FROM PreqCourse_course
 WHERE course_id=@courseID;
@@ -58,7 +198,7 @@ INSERT INTO Course VALUES('CS2','eng',1,1,1); --3
 INSERT INTO Course VALUES('C3','eng',1,1,1); --4
 INSERT INTO PreqCourse_course VALUES(2,3);
 INSERT INTO PreqCourse_course VALUES(3,4);
-INSERT INTO Student_Instructor_Course_Take(student_id,course_id) VALUES(1,1);
+INSERT --?INTO Student_Instructor_Course_Take(student_id,) VALUES(1,null,2);
 INSERT INTO Request VALUES('d','dh','pending',2,1,1,4);
 */
 
@@ -141,5 +281,30 @@ DROP TABLE Result;;
 --add here function for eligibility
 GO
 --exec Procedures_ViewRequiredCourses 1, 'w23'
+
+
+--II
+go
+create proc Procedures_StudentRegisterFirstMakeup
+@StudentID int, @courseID int, @studentCurrent_semester varchar(40)
+as
+declare @examid int, @type varchar(40)
+
+select @examid = exam_id from Makeup_Exam 
+where @courseID = course_id 
+
+select @type=type from MakeUp_Exam where @courseID=course_id    
+if @type='First_makeup'
+begin
+insert into Exam_Student values(@examid , @StudentID, @courseID)
+update Student_Instructor_Course_Take set exam_type='First_makeup'
+where student_id=@StudentID and course_id=@courseID and @studentCurrent_semester=semester_code
+end
+go
+
+exec Procedures_StudentRegisterFirstMakeup 5, 1, '1'
+
+-----------------------------------------------------------------
+
 
 
