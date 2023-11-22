@@ -4,7 +4,6 @@ CREATE DATABASE Advising_Team_47
 GO
 USE Advising_Team_47
 
-
 GO 
 CREATE PROCEDURE CreateAllTables AS
 
@@ -20,7 +19,7 @@ CREATE TABLE Student(
 student_id int PRIMARY KEY IDENTITY,
 f_name varchar(40) NOT NULL,
 l_name varchar(40) NOT NULL,
-gpa decimal(3,2) check(gpa BETWEEN 0.7 AND 4), --? NOT NULL but PROC
+gpa decimal(10,2) check(VALUE BETWEEN 0.7 AND 4), --? NOT NULL but PROC
 faculty varchar(40) NOT NULL,
 email varchar(40) NOT NULL,
 major varchar(40) NOT NULL,
@@ -70,7 +69,7 @@ amount int not null,
 deadline datetime not null,
 n_installments int not null ,
 status varchar(40) not null default 'notPaid' check (status in ('notPaid','Paid')),
-fund_percentage decimal(5,2) not null, --important: max=100.00
+fund_percentage decimal(10,2) not null, --important: max=100.00
 start_date datetime not null,
 student_id int not null,
 semester_code varchar(40) not null,
@@ -121,10 +120,10 @@ CONSTRAINT FK_ICI FOREIGN KEY(instructor_id) references Instructor(instructor_id
 );
 
 CREATE TABLE Student_Instructor_Course_Take(
-student_id int NOT NULL,
-course_id int NOT NULL,
-instructor_id int NOT NULL,
-semester_code varchar(40) NOT NULL,
+student_id int,
+course_id int ,
+instructor_id int,
+semester_code varchar(40),
 exam_type varchar(40) DEFAULT 'Normal' check(exam_type IN ('Normal','First_makeup','Second_makeup')),
 grade varchar(40),  --? check letter?
 PRIMARY KEY(student_id,course_id,instructor_id),
@@ -250,7 +249,7 @@ DROP TABLE Course_Semester;
 DROP TABLE Student;
 DROP TABLE MakeUp_Exam;
 DROP TABLE Course;
-GO
+GO 
 
 --EXEC DropAllTables
 --DROP PROC DropAllTables
@@ -487,7 +486,7 @@ declare @NumInstallments int,
 @TotalAmount int, 
 @Paymentstart_date datetime, 
 @num int =0,
-@InstallmentAmount decimal(8,2) --? right datatype?
+@InstallmentAmount decimal(10,2) --? right datatype?
 
 SELECT @NumInstallments = n_installments,
 @PaymentDeadline = deadline,
@@ -546,14 +545,14 @@ GO
 CREATE PROC Procedures_AdminDeleteSlots( --? why have semester if is_offered tells us all not offered courses
 @current_semester varchar (40))
 AS
-SELECT course_id INTO NotOfferedCourses FROM Course
-WHERE  is_offered=0;
+SELECT course_id INTO NotOfferedCourses FROM Course_Semester CS 
+WHERE  semester_code<> @current_semester;
 DELETE FROM Slot 
 WHERE course_id IN (SELECT * FROM NotOfferedCourses);
 DROP TABLE NotOfferedCourses;;
 GO
 /*
-exec Procedures_AdminDeleteSlots '5';
+exec Procedures_AdminDeleteSlots 'w23';
 
 SELECT * FROM Slot
 SELECT * FROM Course_Semester
@@ -619,7 +618,7 @@ GO
 
 ----------------------------------------------- PLACE V HERE -------------------------------
 GO
-CREATE PROC Procedures_AdvisorApproveRejectCHRequest
+CREATE PROC Procedures_AdvisorApproveRejectCHRequest  --? check type first?
 @RequestID int, 
 @Current_semester_code varchar (40)
 AS 
@@ -634,7 +633,9 @@ SELECT @assigned_hours=assigned_hours FROM Student
 WHERE @student_id = student_id
 
 IF((SELECT gpa FROM Student WHERE student_id=@student_id)<=3.7 AND 
-@assigned_hours+@credit_hrs < 34 AND @credit_hrs< 4 AND @credit_hrs>0)
+(SELECT sum(C.credit_hours) FROM Student_Instructor_Course_Take S,
+ Course C WHERE C.course_id=S.course_id AND S.student_id=@student_id AND S.semester_code=@Current_semester_code)
++@credit_hrs <= 34 AND @credit_hrs< 4 AND @credit_hrs>0)
 BEGIN
 UPDATE Request set status = 'approved'
 WHERE @RequestID = request_id;
