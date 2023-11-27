@@ -1,4 +1,70 @@
-﻿create function dbo.FN_Advisors_Requests(
+﻿
+
+GO
+CREATE FUNCTION dbo.FN_StudentUpcoming_installment
+(
+    @StudentID int
+)
+RETURNS date
+AS 
+BEGIN
+    DECLARE @CurrDate datetime = GETDATE()
+    DECLARE @date datetime
+
+    SELECT TOP 1 @date = i.deadline
+    FROM Installment i
+    INNER JOIN Payment p ON p.payment_id = i.payment_id
+    INNER JOIN Student s ON s.student_id = p.student_id
+    WHERE s.student_id = @StudentID AND i.status = 'notPaid'
+    ORDER BY DATEDIFF(DAY, @CurrDate, i.deadline)
+
+    RETURN @date
+END;
+GO
+
+--INSERT INTO Installment VALUES(49,'2-20-2001',20,'notPaid','1-20-2001')
+--declare @output date=dbo.FN_StudentUpcoming_installment(1);print @output
+
+declare @output datetime
+set @output= dbo.FN_StudentUpcoming_installment (5)
+print (@output)
+go
+
+-------------------------------------------------
+
+go
+create function dbo.FN_StudentViewGP             
+(
+@student_ID int
+)
+returns table 
+as return 
+SELECT S.student_id,S.f_name+' '+S.l_name 'student_name', GP.plan_id,C.course_id,C.name 'course_name',GP.semester_code,GP.expected_grad_date,GP.semester_credit_hours,S.advisor_id
+FROM Graduation_Plan GP INNER JOIN GradPlan_Course GC ON GC.plan_id=GP.plan_id
+INNER JOIN Course C ON C.course_id=GC.course_id INNER JOIN Student S ON S.student_id=GP.student_id
+WHERE GP.student_id=@student_ID;;
+go
+
+--INSERT INTO GradPlan_Course VALUES(1,'s23',1);
+--Select * FROM dbo.FN_StudentViewGP (1)
+----------------------------------------------
+go
+create function dbo.FN_StudentViewSlot
+(
+    @courseID int, @instructorID int
+
+)
+RETURNS table
+AS return
+SELECT S.slot_id,S.location,S.time, S.day, C.name 'course_name',I.name 'instructor_name' FROM Slot S  INNER JOIN Instructor I ON S.instructor_id=I.instructor_id
+INNER JOIN Course C ON S.course_id=C.course_id
+WHERE C.course_id=@courseID AND I.instructor_id=@instructorID;
+go
+--SELECT * FROM dbo.FN_StudentViewSlot (1,1)
+
+
+------------------------------------------
+create function dbo.FN_Advisors_Requests(
 @advisorID int
 )
 returns @Result Table
@@ -104,39 +170,66 @@ go
 
 --select * from dbo.SemesterAvailableCourses('w23')
 
-------------------------------------------
-create function dbo.FN_StudentViewSlot
-(
-    @courseID int, @instructorID int
 
-)
-RETURNS @Result table (slotID int, location varchar(40), time varchar(40),day varchar(40),course_name varchar(40), instructor_name varchar(40))
-AS
-Begin
-declare @course_name varchar(40)
-declare @instructor_name varchar(40)
 
-select @course_name=name from Course where @courseID=course_id
-select @instructor_name=name from Instructor where @instructorID=instructor_id
+--------------MM
+go
+create proc Procedures_ViewOptionalCourse
+@StudentID int , @current_semester_code varchar(40)
+as
 
-insert into @Result(slotID,location,time,day) select slot_id,day,time,location from Slot where course_id=@courseID and instructor_id=@instructorID
-insert into @Result(course_name) select name from Course where @courseID=course_id
-insert into @Result(instructor_name) select name from Instructor where @instructorID=instructor_id
+SELECT * FROM Course C INNER JOIN Student S ON C.major = S.major INNER JOIN Course_Semester CS ON C.course_id = CS.course_id
+WHERE S.student_id = @StudentID AND @current_semester_code <= CS.semester_code
 
 
 
-return
-end
+
+
 go
 
-select * from dbo.FN_StudentViewSlot(1,1)
+drop proc Procedures_ViewOptionalCourse
+exec Procedures_ViewOptionalCourse 5 , 'w23'
 
-select * from Course
-select * from Instructor
-select * from Slot
-insert into Slot values('13','15','Yes',1,1)
 
-------------------------------------------
+----EXCEPT (SELECT * FROM Course C2 INNER JOIN Student S2 ON C2.major = S2.major INNER JOIN Course_Semester CS2 ON CS2.course_id = C2.course_id WHERE @current_semester_code = CS2.semester_code)------
+------------------
+
+
+
+--NN
+go
+create proc Procedures_ViewMS
+@StudentID int
+as
+DECLARE @current_semester_code varchar(40)
+DECLARE @course_id varchar(40)
+
+SELECT @course_id = course_id FROM Student S INNER JOIN Course C ON S.major = C.major  
+WHERE S.student_id = @StudentID
+
+SELECT @current_semester_code = S1.semester_code FROM Semester S1 INNER JOIN Course_Semester CS ON CS.course_id = @course_id
+
+SELECT * FROM Course C INNER JOIN Student S ON C.major = S.major INNER JOIN Course_Semester CS ON C.course_id = CS.course_id
+WHERE S.student_id = @StudentID
+EXCEPT (SELECT * FROM Course C2 INNER JOIN Student S2 ON C2.major = S2.major INNER JOIN Course_Semester CS2 ON CS2.course_id = C2.course_id
+WHERE @current_semester_code > CS2.semester_code)
+
+
+
+
+go
+------------------------------------------------------
+
+exec Procedures_ViewMS 5 
+
+SELECT * FROM Student
+SELECT * FROM Semester
+SELECT * FROM Course
+SELECT * FROM Course_Semester
+insert into Course values (4,'math -1' , 'MET' , 1 , 12 , 8)
+insert into Semester values('w22' , '2003-04-09' , '2003-05-12')
+insert into Course_Semester values(4, 'w22')
+
 --X
 GO
 CREATE PROC Procedures_AdvisorViewAssignedStudents
@@ -288,18 +381,22 @@ go
 create proc Procedures_StudentRegisterFirstMakeup
 @StudentID int, @courseID int, @studentCurrent_semester varchar(40)
 as
-declare @examid int, @type varchar(40)
+declare @examid int, @next_semester varchar(40),@end_of_prev_semester date
 
-select @examid = exam_id from Makeup_Exam 
-where @courseID = course_id 
+SELECT end_date=@end_of_prev_semester
+FROM Semester WHERE  @studentCurrent_semester=semester_code
 
-select @type=type from MakeUp_Exam where @courseID=course_id    
-if @type='First_makeup'
-begin
-insert into Exam_Student values(@examid , @StudentID, @courseID)
-update Student_Instructor_Course_Take set exam_type='First_makeup'
-where student_id=@StudentID and course_id=@courseID and @studentCurrent_semester=semester_code
-end
+select top 1 semester_code=@next_semester
+FROM Semester 
+WHERE start_date>=@end_of_prev_semester
+ORDER BY start_date
+
+select top 1 @examid = exam_id from Makeup_Exam 
+where @courseID = course_id AND date>=@end_of_prev_semester AND type='First_makeup'
+ORDER BY date
+
+INSERT INTO Exam_Student VALUES(@examid , @StudentID, @courseID)
+INSERT INTO Student_Instructor_Course_Take(student_id,course_id,semester_code,exam_type) VALUES(@StudentID,@courseID,@next_semester,'First_makeup');;
 go
 
 exec Procedures_StudentRegisterFirstMakeup 5, 1, '1'

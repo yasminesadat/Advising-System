@@ -1,4 +1,5 @@
 ﻿--DROP DATABASE Advising_Team_47
+
 CREATE DATABASE Advising_Team_47
 
 GO
@@ -19,7 +20,7 @@ CREATE TABLE Student(
 student_id int PRIMARY KEY IDENTITY,
 f_name varchar(40) NOT NULL,
 l_name varchar(40) NOT NULL,
-gpa decimal(10,2) check(gpa BETWEEN 0.7 AND 4), --? NOT NULL but PROC
+gpa decimal(10,2) check(gpa BETWEEN 0.7 AND 5), --? NOT NULL but PROC
 faculty varchar(40) NOT NULL,
 email varchar(40) NOT NULL,
 major varchar(40) NOT NULL,
@@ -44,8 +45,8 @@ semester int NOT NULL
 );
 
 CREATE TABLE Request(
-request_id int primary key,
-type varchar(40) not null,
+request_id int primary key IDENTITY,
+type varchar(40) not null check(type IN('course_request','credit_hours_request')),
 comment varchar(40) not null,
 status varchar(40) not null check(status IN ('pending','approved','rejected')) default 'pending',
 credit_hours int,  --? will be null if it is an add course request
@@ -75,7 +76,8 @@ student_id int not null,
 semester_code varchar(40) not null,
 CONSTRAINT FK_Payment_S foreign key (student_id) references Student(student_id) ,
 CONSTRAINT FK_Payment_SC foreign key (semester_code) references Semester(semester_code),
-CONSTRAINT Chk_Installments check (n_installments IN(0,DATEDIFF(MONTH, start_date, deadline)))
+--CONSTRAINT Chk_Installments  --check (n_installments IN(0,DATEDIFF(MONTH, start_date, deadline)))
+                             --for us to add correct values
 );
 
 CREATE TABLE Installment(
@@ -194,13 +196,13 @@ EXEC CreateAllTables;
 INSERT INTO Advisor VALUES('ahmed','hi@gmail.com','C5','cheese');
 INSERT INTO Student VALUES('ali','z',2.1,'eng','@','MET','batetes',1,4,3,2,1);
 INSERT INTO Course VALUES('math','eng',1,23,1);
-INSERT INTO Request VALUES(5435,'a','hi','pending',13,1,1,1);
+INSERT INTO Request VALUES('course_request','hi','pending',13,1,1,1);
 INSERT INTO Semester VALUES('1','1-11-2000','1-12-2000');
 INSERT INTO Payment VALUES(49,12345,'11-25-2000',4,'notPaid',50,'7-2-2000',1,'1');
 INSERT INTO Installment VALUES(49,'11-2-2000',13,'notPaid','11-20-2000');
 INSERT INTO Instructor VALUES(1,'ah','@','M','C');
 INSERT INTO MakeUp_Exam VALUES('11-2-2020','First_makeup',1);
-INSERT INTO Graduation_Plan VALUES('s23',20,1,1,1);
+INSERT INTO Graduation_Plan VALUES('s23',20,'11-20-2024',1,1);
 INSERT INTO Slot VALUES('mon','first','C3.215',1,1);
 ----------------------------------------------------------------------------------------
 
@@ -285,9 +287,10 @@ advisor_id FROM Student WHERE financial_status=1;
 
 GO
 CREATE VIEW view_Course_prerequisites AS
-SELECT C.*,PC.prerequisite_course_id 
+SELECT C.*,PC.prerequisite_course_id ,C2.name prerequisite_name
 FROM Course C LEFT OUTER JOIN 
-     PreqCourse_course PC ON C.course_id=PC.course_id;
+     PreqCourse_course PC ON C.course_id=PC.course_id 
+     LEFT OUTER JOIN Course C2 ON PC.course_id=C2.course_id;
 --- SELECT * FROM view_Course_prerequisites;
 
 GO 
@@ -558,7 +561,27 @@ SELECT * FROM Course_Semester
 SELECT * FROM Course
 */
 
------------------------------------------------ PLACE Q HERE -------------------------------
+GO
+CREATE FUNCTION dbo.FN_AdvisorLogin
+(
+    @Advisor_ID int ,
+    @password varchar(40)
+
+)
+RETURNS Bit 
+AS
+Begin
+DECLARE @confirm bit=0
+IF @password=
+(SELECT password from Advisor WHERE advisor_id=@Advisor_ID)
+set @confirm=1
+
+return @confirm
+end;
+go
+-- declare @output bit=dbo.FN_AdvisorLogin(1,'cheese');print(@output);
+-- declare @output bit=dbo.FN_AdvisorLogin(1,'chese');print(@output);
+
 GO
 CREATE PROC Procedures_AdvisorCreateGP
 @semester_code varchar(40),
@@ -584,22 +607,10 @@ INSERT INTO GradPlan_Course values(@planID,@Semester_code, (select course_id fro
 GO
 --exec Procedures_AdvisorAddCourseGP 1,'s23','math'
 
---- 2.3 Z ---
-GO
-CREATE PROC Procedures_AdvisorViewPendingRequests
-@advisorID int
-AS
-Select R.request_id, R.type, R.comment,R.credit_hours,R.student_id,R.course_id 
-FROM Request R WHERE R.status='pending' AND R.advisor_id=@advisorID;
-GO
--- EXEC Procedures_AdvisorViewPendingRequests 1;
-
 GO
 CREATE PROC Procedures_AdvisorUpdateGP
-@expected_grad_semester varchar(40), @studentID int
+@expected_grad_date date, @studentID int
 AS
-DECLARE @expected_grad_date DATE
-SELECT @expected_grad_date=end_date FROM Semester WHERE @expected_grad_semester=semester_code;
 Update Graduation_Plan 
 Set expected_grad_date = @expected_grad_date
 Where student_id = @studentID;;
@@ -617,7 +628,18 @@ where course_id=@courseID and plan_id=(select plan_id from Graduation_Plan where
 GO
 --exec Procedures_AdvisorDeleteFromGP 1,'s23',1;
 
------------------------------------------------ PLACE V HERE -------------------------------
+GO
+CREATE FUNCTION dbo.FN_Advisors_Requests(
+@advisorID int
+)
+returns Table
+as
+return SELECT * FROM Request 
+WHERE @advisorID = Request.advisor_id;
+
+GO
+--SELECT * FROM dbo.FN_Advisors_Requests(1);
+
 GO
 CREATE PROC Procedures_AdvisorApproveRejectCHRequest  --? check type first?
 @RequestID int, 
@@ -648,6 +670,213 @@ UPDATE Request set status = 'rejected'
 WHERE @RequestID = request_id;;
 GO
 -- not tested yet
+--X
+GO
+CREATE PROC Procedures_AdvisorViewAssignedStudents
+@AdvisorID int, 
+@major varchar(40)
+as
+SELECT Student.student_id, Student.f_name+ ' '+Student.l_name as name, Student.major, Course.name as course_name
+from Student inner join Student_Instructor_Course_Take on Student.student_id=Student_Instructor_Course_Take.student_id
+inner join Course on Course.course_id=Student_Instructor_Course_Take.course_id
+where Student.advisor_id=@AdvisorID and Student.major=@major;;
+GO
+--exec Procedures_AdvisorViewAssignedStudents 1,'CS'
 
+--Y 
+GO
+CREATE PROC Procedures_AdvisorApproveRejectCourseRequest  
+@RequestID int,
+@current_semester_code varchar(40)
+AS
+if 'course_request'<>(Select type from Request where request_id=@requestID)
+print 'this request is an add credit hours request'
+else 
+begin
+DECLARE @courseID int,
+@assigned_hours int,
+@credit_hrs int,
+@studentID int
 
+SELECT @courseID=course_id,@studentID=student_id FROM Request 
+WHERE @RequestID=request_id;
 
+SELECT @assigned_hours=assigned_hours FROM Student
+WHERE @studentID=student_id;
+
+SELECT @credit_hrs=credit_hours FROM Course
+WHERE course_id=@courseID
+
+SELECT prerequisite_course_id INTO PreqTable FROM PreqCourse_course
+WHERE course_id=@courseID;
+
+IF(@assigned_hours-@credit_hrs>=0 
+AND NOT EXISTS(
+Select * from PreqTable 
+EXCEPT(SELECT course_id
+FROM Student_Instructor_Course_Take SCT WHERE
+SCT.student_id=@studentID)
+          )
+ AND EXISTS 
+(SELECT course_id FROM Course_Semester WHERE 
+semester_code=@current_semester_code AND course_id=@courseID)
+)
+
+BEGIN
+UPDATE Request set status = 'approved' WHERE @RequestID = request_id;
+UPDATE Student set assigned_hours=@assigned_hours-@credit_hrs;
+INSERT INTO  Student_Instructor_Course_Take(student_id, course_id,semester_code) VALUES(@studentID, @courseID,@current_semester_code );
+END
+
+ELSE
+UPDATE Request set status = 'rejected'
+WHERE @RequestID = request_id
+DROP TABLE PreqTable
+end;;
+GO
+/*
+INSERT INTO Course VALUES('CS1','eng',1,1,1); --2
+INSERT INTO Course VALUES('CS2','eng',1,1,1); --3
+INSERT INTO Course VALUES('C3','eng',1,1,1); --4
+INSERT INTO PreqCourse_course VALUES(2,3);
+INSERT INTO PreqCourse_course VALUES(3,4);
+INSERT INTO Request VALUES(1,'d','dh','pending',null,1,1,1);
+EXEC Procedures_AdvisorApproveRejectCourseRequest 1,1,2
+*/
+
+--- Z ---
+GO
+CREATE PROC Procedures_AdvisorViewPendingRequests
+@advisorID int
+AS
+Select R.request_id, R.type, R.comment,R.credit_hours,R.student_id,R.course_id 
+FROM Request R WHERE R.status='pending' AND R.advisor_id=@advisorID;
+GO
+-- EXEC Procedures_AdvisorViewPendingRequests 1;
+
+--*************** DOUBLE  LETTERS ********************
+GO
+CREATE FUNCTION dbo.FN_StudentLogin
+(
+    @Student_ID int ,
+    @password varchar(40)
+
+)
+RETURNS Bit 
+AS
+Begin
+DECLARE @confirm bit =0
+
+IF @password=(SELECT password FROM Student WHERE student_id=@Student_ID)
+set @confirm=1
+
+return @confirm
+end;
+GO
+--DECLARE @output bit=dbo.FN_StudentLogin(1,'batetes');print @output
+--DECLARE @output bit=dbo.FN_StudentLogin(1,'bates');print @output
+
+GO
+CREATE PROC  Procedures_StudentaddMobile 
+@StudentID int,@mobile_number varchar(40)
+AS
+INSERT INTO Student_Phone VALUES(@StudentID,@mobile_number);
+GO
+--EXEC Procedures_StudentaddMobile 1, '+201004325'
+
+GO
+CREATE FUNCTION dbo.FN_SemsterAvailableCourses
+(@semester_code varchar (40))
+returns table
+AS return SELECT C.course_id,C.name FROM Course C INNER JOIN Course_Semester CS ON
+C.course_id=CS.course_id WHERE CS.semester_code=@semester_code;
+GO
+--not tested
+
+GO
+CREATE PROCEDURE  Procedures_StudentSendingCourseRequest
+@StudentID int,
+@courseID int,
+@type varchar(40),
+@comment varchar(40)
+AS
+declare @advisor_id int=(SELECT advisor_id FROM Student WHERE student_id=@StudentID )
+INSERT INTO Request(student_id,course_id,type,comment,advisor_id) VALUES(@StudentID,@courseID,@type,@comment,@advisor_id);;
+GO
+--EXEC Procedures_StudentSendingCourseRequest 1, 1, 'course_request', 'asap'
+
+GO
+CREATE PROCEDURE  Procedures_StudentSendingCHRequest
+@StudentID int,
+@credit_hours int,
+@type varchar(40),
+@comment varchar(40)
+AS
+declare @advisor_id int=(SELECT advisor_id FROM Student WHERE student_id=@StudentID )
+INSERT INTO Request(student_id,type,comment,advisor_id,credit_hours) VALUES(@StudentID,@type,@comment,@advisor_id,@credit_hours);;
+GO
+--EXEC Procedures_StudentSendingCHRequest 1, 10, 'credit_hours_request', 'asap'
+
+go
+create function dbo.FN_StudentViewGP             
+(
+@student_ID int
+)
+returns table 
+as return 
+SELECT S.student_id,S.f_name+' '+S.l_name 'student_name', GP.plan_id,C.course_id,C.name 'course_name',GP.semester_code,GP.expected_grad_date,GP.semester_credit_hours,S.advisor_id
+FROM Graduation_Plan GP INNER JOIN GradPlan_Course GC ON GC.plan_id=GP.plan_id
+INNER JOIN Course C ON C.course_id=GC.course_id INNER JOIN Student S ON S.student_id=GP.student_id
+WHERE GP.student_id=@student_ID;;
+go
+
+--INSERT INTO GradPlan_Course VALUES(1,'s23',1)
+--Select * FROM dbo.FN_StudentViewGP (1)
+
+GO
+CREATE FUNCTION dbo.FN_StudentUpcoming_installment
+(
+    @StudentID int
+)
+RETURNS date
+AS 
+BEGIN
+    DECLARE @CurrDate datetime = GETDATE()
+    DECLARE @date datetime
+
+    SELECT TOP 1 @date = i.deadline
+    FROM Installment i
+    INNER JOIN Payment p ON p.payment_id = i.payment_id
+    INNER JOIN Student s ON s.student_id = p.student_id
+    WHERE s.student_id = @StudentID AND i.status = 'notPaid'
+    ORDER BY DATEDIFF(DAY, @CurrDate, i.deadline)
+
+    RETURN @date
+END;
+GO
+
+--INSERT INTO Installment VALUES(49,'2-20-2001',20,'notPaid','1-20-2001')
+--declare @output date=dbo.FN_StudentUpcoming_installment(1);print @output
+
+go
+create proc Procedures_StudentRegisterFirstMakeup
+@StudentID int, @courseID int, @studentCurrent_semester varchar(40)
+as
+declare @examid int, @next_semester varchar(40),@end_of_prev_semester date
+
+SELECT end_date=@end_of_prev_semester
+FROM Semester WHERE  @studentCurrent_semester=semester_code
+
+select top 1 semester_code=@next_semester
+FROM Semester 
+WHERE start_date>=@end_of_prev_semester
+ORDER BY start_date
+
+select top 1 @examid = exam_id from Makeup_Exam 
+where @courseID = course_id AND date>=@end_of_prev_semester AND type='First_makeup'
+ORDER BY date
+
+INSERT INTO Exam_Student VALUES(@examid , @StudentID, @courseID)
+INSERT INTO Student_Instructor_Course_Take(student_id,course_id,semester_code,exam_type) VALUES(@StudentID,@courseID,@next_semester,'First_makeup');;
+go
+--not tested
