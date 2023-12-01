@@ -46,11 +46,10 @@ semester int NOT NULL
 
 CREATE TABLE Request(
 request_id int primary key IDENTITY,
-type varchar(40) not null check(type IN('course_request','credit_hours_request')),
+type varchar(40) not null,
 comment varchar(40) not null,
 status varchar(40) not null check(status IN ('pending','approved','rejected')) default 'pending',
-credit_hours int,  --? will be null if it is an add course request
-                   --? have its check here or in procedure only?
+credit_hours int,  
 student_id int not null,
 advisor_id int not null,
 course_id int,
@@ -65,7 +64,7 @@ start_date DATE NOT NULL, 
 end_date DATE NOT NULL);
 
 CREATE TABLE Payment(
-payment_id int primary key,
+payment_id int primary key IDENTITY,
 amount int not null,
 deadline datetime not null,
 n_installments int not null ,
@@ -98,7 +97,7 @@ CONSTRAINT FK_SP FOREIGN KEY(student_id) references Student(student_id)
 );
 
 CREATE TABLE Instructor(
-instructor_id int PRIMARY KEY,
+instructor_id int PRIMARY KEY IDENTITY,
 name varchar(40) NOT NULL,
 email varchar(40) NOT NULL,
 faculty varchar(40) NOT NULL,
@@ -126,7 +125,7 @@ student_id int,
 course_id int ,
 instructor_id int,
 semester_code varchar(40),
-exam_type varchar(40) DEFAULT 'Normal' check(exam_type IN ('Normal','First_makeup','Second_makeup')),
+exam_type varchar(40) DEFAULT 'Normal',
 grade varchar(40),  --? check letter?
 PRIMARY KEY(student_id,course_id,semester_code),
 CONSTRAINT FK_SIC1 FOREIGN KEY(student_id) references Student(student_id),
@@ -137,7 +136,7 @@ CONSTRAINT FK_SIC3 FOREIGN KEY(instructor_id) references Instructor(instructor_i
 CREATE TABLE MakeUp_Exam(
 exam_id int PRIMARY KEY IDENTITY,
 date datetime NOT NULL,
-type varchar(40) NOT NULL check(type IN ('First_makeup','Second_makeup')),
+type varchar(40) NOT NULL,
 course_id int not null,
 CONSTRAINT FK_MU FOREIGN KEY (course_id) references Course(course_id)
 );
@@ -193,6 +192,7 @@ GO
 
 EXEC CreateAllTables;
 ----------------------------------- TEST VALUES ---------------------------------------
+/**
 INSERT INTO Advisor VALUES('ahmed','hi@gmail.com','C5','cheese');
 INSERT INTO Student VALUES('ali','z',2.1,'eng','@','MET','batetes',1,4,3,2,1);
 INSERT INTO Course VALUES('math','eng',1,23,1);
@@ -200,10 +200,11 @@ INSERT INTO Request VALUES('course_request','hi','pending',13,1,1,1);
 INSERT INTO Semester VALUES('1','1-11-2000','1-12-2000');
 INSERT INTO Payment VALUES(49,12345,'11-25-2000',4,'notPaid',50,'7-2-2000',1,'1');
 INSERT INTO Installment VALUES(49,'11-2-2000',13,'notPaid','11-20-2000');
-INSERT INTO Instructor VALUES(1,'ah','@','M','C');
+INSERT INTO Instructor VALUES('ah','@','M','C');
 INSERT INTO MakeUp_Exam VALUES('11-2-2020','First_makeup',1);
 INSERT INTO Graduation_Plan VALUES('s23',20,'11-20-2024',1,1);
 INSERT INTO Slot VALUES('mon','first','C3.215',1,1);
+**/
 ----------------------------------------------------------------------------------------
 
 GO
@@ -641,10 +642,13 @@ GO
 --SELECT * FROM dbo.FN_Advisors_Requests(1);
 
 GO
-CREATE PROC Procedures_AdvisorApproveRejectCHRequest  --? check type first?
+CREATE PROC Procedures_AdvisorApproveRejectCHRequest  
 @RequestID int, 
 @Current_semester_code varchar (40)
 AS 
+IF (Select type from Request where request_id=@requestID) not like '%credit%'
+print 'this request is not an add credit hours request'
+else 
 DECLARE @assigned_hours int,
 @student_id int,
 @credit_hrs int
@@ -689,8 +693,8 @@ CREATE PROC Procedures_AdvisorApproveRejectCourseRequest
 @RequestID int,
 @current_semester_code varchar(40)
 AS
-if 'course_request'<>(Select type from Request where request_id=@requestID)
-print 'this request is an add credit hours request'
+IF (Select type from Request where request_id=@requestID) not like '%course%'
+print 'this request is not an add course request'
 else 
 begin
 DECLARE @courseID int,
@@ -873,10 +877,10 @@ WHERE start_date>=@end_of_prev_semester
 ORDER BY start_date
 
 select top 1 @examid = exam_id from Makeup_Exam 
-where @courseID = course_id AND date>=@end_of_prev_semester AND type='First_makeup'
+where @courseID = course_id AND date>=@end_of_prev_semester AND type LIKE 'First'
 ORDER BY date
 
 INSERT INTO Exam_Student VALUES(@examid , @StudentID, @courseID)
-INSERT INTO Student_Instructor_Course_Take(student_id,course_id,semester_code,exam_type) VALUES(@StudentID,@courseID,@next_semester,'First_makeup');;
+INSERT INTO Student_Instructor_Course_Take(student_id,course_id,semester_code,exam_type) VALUES(@StudentID,@courseID,@next_semester,'First Makeup');;
 go
 --not tested
