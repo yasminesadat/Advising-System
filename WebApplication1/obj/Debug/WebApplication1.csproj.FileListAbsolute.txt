@@ -1,0 +1,2 @@
+E:\Semester 5\Data Base\Project\M3\WebApp\WebApplication1\WebApplication1\obj\Debug\WebApplication1.csproj.AssemblyReference.cache
+E:\Semester 5\Data Base\Project\M3\WebApp\WebApplication1\WebApplication1\obj\Debug\WebApplication1.csproj.CoreCompileInputs.cache
