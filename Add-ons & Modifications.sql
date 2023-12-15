@@ -171,7 +171,6 @@ AS
 SET @exists=CASE WHEN (EXISTS(SELECT * FROM Advisor WHERE @email=email)) THEN 1 ELSE 0 END;
 GO
 
-
 GO
 CREATE PROC Check_Plan
 @Semester_code varchar(40), 
@@ -180,7 +179,7 @@ CREATE PROC Check_Plan
 @exists bit output,
 @valid bit output
 AS
-SET @exists=CASE WHEN (EXISTS(SELECT * FROM Graduation_Plan WHERE @Semester_code=semester_code AND @student_id=student_id)) THEN 1 ELSE 0 END;
+SET @exists=CASE WHEN (EXISTS(SELECT * FROM Graduation_Plan WHERE @Semester_code=semester_code AND @student_id=student_id and advisor_id=@advisorID)) THEN 1 ELSE 0 END;
 
 SET @valid=CASE WHEN (EXISTS (SELECT * FROM Student WHERE student_id=@student_id AND advisor_id=@advisorID)) AND EXISTS((SELECT * FROM Semester WHERE semester_code=@Semester_code)) THEN 1 ELSE 0 END;
 GO
@@ -240,3 +239,100 @@ WHERE GP.student_id=@student_id AND GP.advisor_id=@advisorID AND @Semester_code=
 AND C.name=@course_name)) THEN 1 ELSE 0 END;
 GO
 
+
+-----------ADMIN PART-----------------
+-------------------AdminAddExam-------------------------
+Go
+CREATE PROC [Procedures_AdminAddExam]
+
+@Type varchar(40), 
+@date datetime,
+@courseID int
+As
+insert into MakeUp_Exam values (@date, @Type, @courseID);
+Go
+
+----------------Procedure_AdminUpdateStudentStatus----------
+go 
+create proc [Procedure_AdminUpdateStudentStatus]
+@student_id int,
+@status bit output
+as
+ update Student
+ set financial_status = dbo.FN_AdminCheckStudentStatus(@student_id)
+ where student_id = @student_id
+ set @status=(SELECT financial_status FROM Student WHERE student_id=@student_id)
+ go
+
+ -----------------------------------------------------------------
+
+ GO
+ CREATE PROC Check_Student
+ @student_id int,
+ @exists bit output
+ AS
+ SET @exists= CASE WHEN (EXISTS(SELECT * FROM Student WHERE student_id=@student_id)) THEN 1 ELSE 0 END;
+ GO
+
+GO
+CREATE PROC Check_Admin_Add_Exam
+@courseID int,
+@type varchar(40),
+@date date,
+@exists bit output,
+@validType bit output,
+@recordExists bit output
+AS 
+SET @exists=CASE WHEN (EXISTS(SELECT * FROM Course WHERE course_id=@courseID)) 
+then 1 else 0 end;
+SET @validType=CASE WHEN (@type LIKE '%first%' or @type LIKE '%second%') THEN 1 ELSE 0 END;
+SET @recordExists=CASE WHEN (EXISTS(SELECT * FROM MakeUp_Exam WHERE course_id=@courseID AND @date=date AND type=@type)) THEN 1 ELSE 0 END;
+GO
+
+
+  ----------------------------------[FN_AdminCheckStudentStatus]-------------------------------------
+/*
+Un/Block student based on his/her financial status {
+note that student has an attribute status which is updated based on his/her due payments. 
+If the student is blocked, he/she can’t login to the system}
+Name: AdminCheckStudentStatus
+Input: StudentID int
+ Output: bit
+Type: Function
+*/
+Go
+CREATE FUNCTION [FN_AdminCheckStudentStatus]
+(@student_id int)
+returns bit
+AS BEGIN
+declare @output bit
+If EXISTS(Select * FROM Student S INNER JOIN Payment P ON S.student_id=P.student_id 
+INNER JOIN Installment I ON I.payment_id=P.payment_id WHERE S.student_id=@student_id AND I.deadline<CURRENT_TIMESTAMP AND I.status='notPaid')
+SET @output=0
+ELSE 
+SET @output=1
+return @output 
+END;
+Go
+
+---------------------DROPS---------------------
+/*
+DROP PROCEDURE IF EXISTS Procedures_AdvisorApproveRejectCHRequest;
+DROP PROCEDURE IF EXISTS Check_Major;
+DROP PROCEDURE IF EXISTS Check_Request_Exists;
+DROP PROCEDURE IF EXISTS Check_Request_Pending;
+DROP PROCEDURE IF EXISTS Procedures_AdvisorApproveRejectCourseRequest;
+DROP PROCEDURE IF EXISTS Procedures_AdvisorCreateGP;
+DROP PROCEDURE IF EXISTS View_Advisor_Students;
+DROP PROCEDURE IF EXISTS Check_Advisor_Exists;
+DROP PROCEDURE IF EXISTS Check_Plan;
+DROP PROCEDURE IF EXISTS Check_Update_Plan;
+DROP PROCEDURE IF EXISTS Check_GradPlan_Course;
+DROP PROCEDURE IF EXISTS Check_Insert_GPCourse;
+DROP PROCEDURE IF EXISTS Procedures_AdminAddExam;
+DROP PROCEDURE IF EXISTS Procedure_AdminUpdateStudentStatus;
+DROP PROCEDURE IF EXISTS Check_Student;
+DROP PROCEDURE IF EXISTS Check_Admin_Add_Exam;
+DROP FUNCTION IF EXISTS FN_AdminCheckStudentStatus;
+
+*/

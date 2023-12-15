@@ -15,7 +15,7 @@ namespace WebApplication1
         }
         protected void AdminPage(object sender, EventArgs e)
         {
-            Response.Redirect("Admin_Login.aspx");
+            Response.Redirect("AdminModify2.aspx");
         }
         protected void AdvisorPage(object sender, EventArgs e)
         {

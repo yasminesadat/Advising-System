@@ -93,7 +93,7 @@ namespace WebApplication1
 
                         // Create a new table cell for the course
                         TableCell courseCell = new TableCell();
-                        courseCell.Text = rdr.GetString(rdr.GetOrdinal("Course_name"));
+                        courseCell.Text = rdr.IsDBNull(rdr.GetOrdinal("Course_Name")) ? "null" : rdr.GetString(rdr.GetOrdinal("Course_Name")).ToString();
                         row.Cells.Add(courseCell);
 
                         // Add the row to the table

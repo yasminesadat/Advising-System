@@ -18,7 +18,7 @@ namespace WebApplication1
         }
         protected void exitPressed(object sender, EventArgs e)
         {
-            Response.Redirect("Main_Page.aspx");
+            Response.Redirect("WelcomePage.aspx");
         }
         protected void loginPressed(object sender, EventArgs e)
         {

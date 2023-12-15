@@ -1,18 +1,18 @@
-﻿body {
+﻿.body-with-image {
     margin: 0;
     padding: 0;
-    background: url('bg.jpg') no-repeat;
+    background: url('bg.jpg') no-repeat; 
     font-family: Arial, sans-serif;
     background-repeat: no-repeat;
-    background-size: 100% 100%;
+    background-size: 100%;
 }
 
-.body2 {
-    background: rgb(0,172,255);
-    background: linear-gradient(214deg, rgba(0,172,255,1) 0%, rgba(9,9,121,1) 22%, rgba(0,212,255,1) 100%);
+.body-with-gradient {
     padding: 0;
     font-family: Arial, sans-serif;
-    margin: 4px;
+    background: rgb(0,0,0);
+    background: linear-gradient(90deg, rgba(2,0,36,1) 0%, rgba(0,212,255,1) 0%, rgba(8,31,135,1) 32%, rgba(9,9,121,1) 75%);
+    margin-left: 5px;
 }
 
 html {
@@ -27,14 +27,14 @@ h1.PopAnim {
     font-family: sans-serif;
     font-size: 2.5em;
     color: #fff;
-    text-shadow: -2px -2px 0 black, 2px -2px 0 black, -2px 2px 0 black, 2px 2px 0 black;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 .container h2.typed-out {
     font-family: sans-serif;
     font-size: 2.5em;
     color: #fff;
-    text-shadow: -2px -2px 0 black, 2px -2px 0 black, -2px 2px 0 black, 2px 2px 0 black;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 
 
@@ -87,6 +87,8 @@ span {
     background-color: #ffffff;
     border-radius: 20px;
     transition: transform 0.3s, box-shadow 0.3s;
+    margin-left: 10px;
+    margin-right: 10px;
 }
 
     .button:hover {
@@ -126,29 +128,19 @@ button:active {
     background: linear-gradient(32deg, #03a9f4, #f441a5, #ffeb3b, #03a9f4);
 }
 
-/Updated Warning Message/
-.errorText {
-    text-align: center;
-    top: 0;
-    position: fixed;
-    background-color: rgba(169, 169, 169, 0.4);
-    color: red;
-    font-size: 20px;
-    text-shadow: -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black, 1px 1px 0 black;
-    padding: 10px;
-    border-radius: 10px;
-}
-
-/Copied from Yasmine/
+/*advisor added*/
 h1 {
     color: white;
-    font-family: 'Arial';
-    /Custom Shadow/ text-shadow: -2px -2px 0 black, 2px -2px 0 black, -2px 2px 0 black, 2px 2px 0 black;
-    display: inline-block;
+    text-shadow: 2px 2px 2px black;
+}
+
+h2 {
+    color: white;
 }
 
 .bottomText {
     color: white;
+    text-shadow: 1px 1px 1px black;
 }
 
 .DivCenter {
@@ -158,26 +150,13 @@ h1 {
     background-color: rgba(255, 255, 255, 0.5);
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(20px);
-    }
-
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-.successText {
+.errorText {
     text-align: center;
     top: 0;
     position: fixed;
     background-color: rgba(169, 169, 169, 0.4);
-    color: greenyellow;
+    color: red;
     font-size: 20px;
-    text-shadow: -1px -1px 0 black, 1px -1px 0 black, -1px 1px 0 black, 1px 1px 0 black;
     padding: 10px;
     border-radius: 10px;
 }
@@ -193,15 +172,13 @@ h1 {
     transition: transform 0.3s, box-shadow 0.3s;
     margin-left: 10px;
     margin-right: 10px;
-    margin-bottom: 10px;
-    margin-top: 10px;
+    margin-bottom:10px;
+    margin-top:10px;
 }
-
-    .button1:hover {
-        transform: scale(1.1);
-        box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
-    }
-
+.button1:hover {
+    transform: scale(1.1);
+    box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
+}
 button1:before {
     content: '';
     position: absolute;
@@ -226,12 +203,11 @@ button1:active {
 
 .dashboard-title {
     color: black;
-    background-color: rgba(255, 255, 255, 0.5);
-    padding: 10px;
+    background-color: rgba(255, 255, 255, 0.5); 
+    padding: 10px; 
     width: 100%;
 }
-
-/all table styling/
+/*all table styling*/
 .tableStyle {
     border-collapse: collapse;
     width: 100%;
@@ -255,14 +231,13 @@ button1:active {
 }
 
 .closeButton {
-    margin-bottom: 10px;
+    margin-bottom: 10px; 
 }
 
 .label {
     font-weight: bold;
     color: white;
 }
-
 .error {
     color: rgb(190,0,0);
     text-align: left;
@@ -284,15 +259,5 @@ button1:active {
     font-size: 15px;
     font-weight: bold;
     padding: 10px;
-}
-
-.column {
-    float: left;
-    width: 50%;
-}
-
-.row:after {
-    content: "";
-    display: table;
-    clear: both;
+    text-align: center;
 }

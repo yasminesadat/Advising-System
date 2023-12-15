@@ -131,7 +131,7 @@ namespace WebApplication1
 
                 // Create a new table cell for the financial status
                 TableCell financialStatusCell = new TableCell();
-                financialStatusCell.Text = rdr.GetBoolean(rdr.GetOrdinal("financial_status")).ToString();
+                financialStatusCell.Text = rdr.IsDBNull(rdr.GetOrdinal("financial_status")) ? "null" : rdr.GetBoolean(rdr.GetOrdinal("financial_status")).ToString();
                 row.Cells.Add(financialStatusCell);
 
                 // Create a new table cell for the acquired hours
@@ -141,7 +141,7 @@ namespace WebApplication1
 
                 // Create a new table cell for the assigned hours
                 TableCell assignedHoursCell = new TableCell();
-                assignedHoursCell.Text = rdr.GetInt32(rdr.GetOrdinal("assigned_hours")).ToString();
+                assignedHoursCell.Text = rdr.IsDBNull(rdr.GetOrdinal("assigned_hours")) ? "null" : rdr.GetInt32(rdr.GetOrdinal("assigned_hours")).ToString();
                 row.Cells.Add(assignedHoursCell);
 
                 // Add the row to the table

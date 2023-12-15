@@ -5,7 +5,7 @@
 <html xmlns="http://www.w3.org/1999/xhtml">
 <head runat="server">
     <title>Advisor Registration</title>
-     <link rel="stylesheet" type="text/css" href="styles.css" />
+     <link rel="stylesheet" type="text/css" href="style.css" />
 
     <style>
         body {
